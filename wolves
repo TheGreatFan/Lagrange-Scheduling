@@ -1,0 +1,272 @@
+# -*- coding: utf-8 -*-
+"""
+Created on Tue Apr  7 13:16:58 2020
+
+@author: Administrator
+"""
+
+import numpy as np
+import random # random 0，1 之间 uniform 自定义区间 random.random()
+import copy # 直接 = 是地址相等，修改一个会导致源地址也被修改，因此用 deepcopy 复制出一个
+#import partition # 用到里面排序的功能
+import arran3 as a3 # 用到里面排序的功能
+
+# 如果字母大写，代表这是一个 集合 一般情况，偶有个例
+# 如果字母小写，代表这是一个 变量 或 固定值 一般情况，偶有个例
+
+P = [[[0, 40], [1, 30], [3, 45]], [[0, 30], [1, 34], [3, 46]], [[0, 30], [1, 30], [3, 49]], [[0, 34], [1, 35], [3, 50]], [[0, 37], [1, 32], [2, 33], [1, 31], [3, 48]], [[0, 39], [1, 34], [3, 44]], [[0, 39], [1, 36], [2, 37], [3, 45]], [[0, 33], [2, 30], [1, 40], [3, 42]], [[0, 31], [1, 33], [3, 50]], [[0, 35], [1, 40], [3, 48]], [[0, 30], [1, 40], [3, 43]], [[0, 32], [1, 32], [3, 40]], [[0, 33], [1, 30], [3, 41]], [[0, 40], [1, 33], [3, 45]], [[0, 35], [2, 40], [1, 36], [3, 44]], [[0, 36], [1, 39], [3, 41]], [[0, 31], [1, 40], [2, 40], [1, 35], [3, 47]], [[0, 33], [1, 33], [2, 32], [3, 42]], [[0, 36], [1, 40], [3, 49]], [[0, 38], [1, 40], [3, 50]]]
+
+CP = [[[0, 1, 2, 3, 4], [10, 11, 12, 13, 14]], [[5, 6, 7, 8, 9], [15, 16, 17, 18, 19]]] # cast plan
+
+DT = np.array([140, 380, 140, 380]) # due time of casting 要优化的变量，开始浇铸时间 # 一维向量，对应四个浇次
+
+#80
+#P = [[[0, 40], [1, 30], [3, 45]], [[0, 30], [1, 34], [3, 46]], [[0, 30], [1, 30], [3, 49]], [[0, 34], [1, 35], [3, 50]], [[0, 37], [1, 32], [2, 33], [1, 31], [3, 48]], [[0, 39], [1, 34], [3, 44]], [[0, 39], [1, 36], [2, 37], [3, 45]], [[0, 33], [2, 30], [1, 40], [3, 42]], [[0, 31], [1, 33], [3, 50]], [[0, 35], [1, 40], [3, 48]], [[0, 30], [1, 40], [3, 43]], [[0, 32], [1, 32], [3, 40]], [[0, 33], [1, 30], [3, 41]], [[0, 40], [1, 33], [3, 45]], [[0, 35], [2, 40], [1, 36], [3, 44]], [[0, 36], [1, 39], [3, 41]], [[0, 31], [1, 40], [2, 40], [1, 35], [3, 47]], [[0, 33], [1, 33], [2, 32], [3, 42]], [[0, 36], [1, 40], [3, 49]], [[0, 38], [1, 40], [3, 50]], [[0, 40], [1, 30], [3, 45]], [[0, 30], [1, 34], [3, 46]], [[0, 30], [1, 30], [3, 49]], [[0, 34], [1, 35], [3, 50]], [[0, 37], [1, 32], [2, 33], [1, 31], [3, 48]], [[0, 39], [1, 34], [3, 44]], [[0, 39], [1, 36], [2, 37], [3, 45]], [[0, 33], [2, 30], [1, 40], [3, 42]], [[0, 31], [1, 33], [3, 50]], [[0, 35], [1, 40], [3, 48]], [[0, 30], [1, 40], [3, 43]], [[0, 32], [1, 32], [3, 40]], [[0, 33], [1, 30], [3, 41]], [[0, 40], [1, 33], [3, 45]], [[0, 35], [2, 40], [1, 36], [3, 44]], [[0, 36], [1, 39], [3, 41]], [[0, 31], [1, 40], [2, 40], [1, 35], [3, 47]], [[0, 33], [1, 33], [2, 32], [3, 42]], [[0, 36], [1, 40], [3, 49]], [[0, 38], [1, 40], [3, 50]]]
+
+#CP = [[[0, 1, 2, 3, 4], [10, 11, 12, 13, 14], [20, 21, 22, 23, 24], [30, 31, 32, 33, 34]], [[5, 6, 7, 8, 9], [15, 16, 17, 18, 19], [25, 26, 27, 28, 29], [35, 36, 37, 38, 39]]] # cast plan
+
+#DT = np.array([140, 380, 620, 860, 140, 380, 620, 860]) # due time of casting 要优化的变量，开始浇铸时间 # 一维向量，对应四个浇次
+#DT = [[150, 400], [150, 400]] # due time of casting 要优化的变量，开始浇铸时间
+
+NCP = [[] for i in range(len(CP))]
+for k in range(len(CP)): # 遍历 连铸机
+    for n in range(len(CP[k])): # 遍历 浇次
+        for i in range(len(CP[k][n])): # 遍历 炉次
+            NCP[k].append(CP[k][n][i]) # 添加
+        NCP[k].append(-1) # 末尾添上 '-1'
+#print('重新整理连铸阶段', NCP)
+
+MQ = [2, 3, 1, 2] # machine quantity - 各种工艺类型的设备数
+ut = 15 # 运输时间，暂且统一设置为 15，可用二维列表
+gap = 10 # 浇次前换结晶器时间
+q = len(P) # 炉次个数
+N = len(DT) # 浇次个数
+
+CL = [] # 浇次的长度
+for k in range(len(CP)): # 遍历连铸机
+    for n in range(len(CP[k])): # 遍历浇次
+        CL.append(sum(P[i][-1][1] for i in CP[k][n]) + gap) # 把浇次长度加上
+#print('浇次长度（包含后续gap）', CL)
+
+CN = [] # 需要检查和前序浇次时间冲突的浇次
+cout = 0
+for k in range(len(CP)): # 遍历连铸机
+    for n in range(len(CP[k])): # 遍历浇次
+        if n != 0:
+            CN.append(cout)
+            cout += 1
+        else:
+            cout += 1
+#print('需要检查和前序浇次时间冲突的浇次', CN)
+
+S = np.array([len(P[i])-1 for i in range(q)]) # 准备安排的前一阶段
+#print('准备安排的前一阶段', S)
+
+def fmc(j, k): # 第 j 阶段序号为 k 的设备总编号是多少
+    if k <= MQ[j]-1:
+        return k + sum(MQ[n] for n in range(j))
+    return -1
+
+def convert(X): # 转换浇次序列的格式
+    CX = [[0 for i in range(len(CP[k]))] for k in range(len(CP))] # 
+    c = 0 # count
+    for k in range(len(CP)):
+        for n in range(len(CP[k])):
+            CX[k][n] = X[c]
+            c += 1
+    return CX
+
+
+
+c1 = 1 # 总驻留时间惩罚系数
+c2 = 10 # 总提前开浇时间惩罚系数
+c3 = 10 # 总滞后开浇时间惩罚系数
+c4 = 30 # 开始时间出现负数惩罚系数 # 调整不可行解的惩罚值可以调整不可行解向最优解移动的速度
+c5 = 30 # 浇次时间冲突惩罚系数
+###############################################################################
+#STP = np.zeros((len(P), 5)) # 阶段开始时间
+#MCH = np.full((len(P), 5), 0) # 设备选择
+
+#STP = np.full((len(P), 5), -100) # 设备选择
+#MCH = np.full((len(P), 5), -1) # 设备选择
+################-优先值类的变量需要，时间变量不需要-#############################
+#def ones(X): # 使一行中最小的是 0，最大的是 1
+#    for n in range(len(X)):
+#        X[n] = X[n] - min(X[n])
+#        X[n] = X[n]/max(X[n])
+#    return X
+#
+#def onea(X):
+#    X = X - min(X)
+#    return X/max(X)
+########################-solve 求 适应度值 函数写在这里-########################
+def solve(X): # 测试前检查是否符合条件，不符合要重新随机生成
+#    print(X)
+    ##########################-初始系数-###########################################
+    MRT = [[10000 for k in range(MQ[j])] for j in range(len(MQ))] # initial release time 初始释放时间，设置大一些
+    #print('初始设备释放时间：', MRT)
+    #STP = np.zeros((len(P), 5)) # 阶段开始时间
+    STP = np.full((len(P), 5), -100) # 设备选择
+    MCH = np.full((len(P), 5), -1) # 设备选择
+#    print('炉次工序开始时间\n', STP)
+#    print('炉次工序选择设备\n', MCH)
+    
+    NS = np.array([len(P[i])-1 for i in range(q)]) # 准备安排的前一阶段
+    RT = np.array([0 for i in range(q)]) # 已安排工序的开始时间
+    # 浇次
+    CT = convert(X)
+    #print('浇次开始时间', CT)
+    CRT = copy.deepcopy(CT) # 连铸机的占用时间，暂时计算用
+    for k in range(len(CP)): # 遍历 连铸机
+        for n in range(len(CP[k])): # 遍历 浇次
+            for i in range(len(CP[k][n])): # 遍历浇次中的炉次
+                w = CP[k][n][i] # w 为此位置的炉次号
+                STP[w][NS[w]] = CRT[k][n] # 浇铸工序开始时间 为 连铸机释放时间 
+                RT[w] = STP[w][NS[w]] - ut # 炉次释放时间 为 开始时间 - 运输时间
+                MCH[w][NS[w]] = fmc(3, k) # 设备选择 安排上
+                CRT[k][n] += P[w][-1][1] # 连铸机释放时间 + 工序时间
+                NS[w] -= 1
+    #print('连铸时间安排后的炉次释放时间：', RT)
+    #print('******************************-第一阶段连铸时间安排完成-******************************')
+    while min(NS) != 10: # 检查是否 全部工件 已安排完成（未安排的工序为 -1）
+        nr = np.where(RT==np.max(RT))[0][0] # 找出下一个安排的（最晚需要准备就绪的工序）， print(np.where(a==np.max(a))) 可以试试 list 形式的速度
+#        print(RT)
+#        print('下一安排炉次', nr)
+        s = NS[nr] # 阶段
+#        print('准备安排的阶段', NS)
+#        print('准备安排的阶段', s)
+        ty = P[nr][s][0] # 工艺类型
+        #print('工艺类型', ty)
+        k = MRT[ty].index(max(MRT[ty])) # 该阶段的最晚空闲设备
+        #print('安排的设备', k)
+        MCH[nr][s] = fmc(ty, k) # 设备安排上 fmc(nt, k)
+        #print('安排的设备\n', MCH)
+    #    print('设备释放时间', MRT[ty][k])
+    #    print('炉次释放时间', RT[nr])
+    #    print('炉次工序时间', P[nr][s][1])
+        STP[nr][s] = min(MRT[ty][k], RT[nr]) - P[nr][s][1] # 开始时间 = min（设备时间，炉次需要就绪） - 工序时间
+    #    print('安排的开始时间：', STP[nr][s])
+        RT[nr] = STP[nr][s] - ut # 炉次释放时间（可以安排的前一阶段结束时间） = 炉次开始时间 - 运输时间
+        #RT[nr] = max(MRT[ty][k], RT[nr]) + P[nr][s][1] - ut # 炉次本阶段完工时间 为 max(最早空闲设备释放时间 或 炉次释放时间) + 炉次本阶段工时，就绪时间需要加上 运输时间
+        MRT[ty][k] = STP[nr][s] # 设备释放时间 与 上表达式前半部分 相等
+    #    print('设备释放时间：', MRT)
+    #    NS[nr] -= 1 # 更新 待加工阶段
+        if s == 0: # 如果已安排了最初阶段
+            RT[nr] = -100000 # 预期开始时间赋值为极小，表示工件所有工序已安排完成 # 学习过程中 初始值 可能产生比较大的值，因此这里设为绝对值比较大的负数
+            NS[nr] = 10 # 所有阶段安排完，把待安排阶段赋一个 足够大 的值
+        else:
+            NS[nr] -= 1 # 更新 待加工阶段
+    # target 1.驻留时间 2.提前开浇时间 3.滞后开浇时间 4.负时间惩罚 5.浇次时间重叠惩罚
+    target = c1*sum((STP[i][S[i]] - STP[i][0]) for i in range(q)) + c2*sum(max(DT[n] - X[n], 0) for n in range(N)) + c3*sum(max(X[n] - DT[n], 0) for n in range(N)) + c4*sum(max(-STP[i][0], 0) for i in range(q)) + c5*sum(max(-(X[n] - X[n-1] - CL[n-1]), 0) for n in CN) # 1.驻留时间 2.提前开浇时间 3.滞后开浇时间 4.负时间惩罚 5.浇次时间重叠惩罚
+    return target
+###########################-初始种群-##########################################
+MI = 16 # 最大迭代次数
+size = 512 # 种群数量
+G = len(DT) # 需要调整的向量维度与计划时间点数相等
+#X = np.random.rand(size, G)
+
+X = np.random.randint(-100,100,(size,G)) # 生成随机波动值
+print('波动值', X)
+for n in range(len(X)): # 遍历每一个初始值
+    X[n] = X[n] + DT
+X[0] = DT
+print(X)
+###############################################################################
+def arran(liste): # 对 适应度 进行排列 （函数测试通过）
+    arrange = [] # 适应度值 排名 序列，前三个对应 Alpha Betha Theta
+    meme = copy.deepcopy(liste) # 复制一个 X list， 因为要修改
+    for n in range(len(liste)): # 遍历一遍
+        arrange.append(meme.index(min(meme))) # 添加 最好 适应度值在 adapt list 中的位置
+        meme[meme.index(min(meme))] = 1000000 # 添加后把 最好适应度值 赋值为一个适应度非常不好的值 1000000（或 max(adapt)+1 ?），找第二好的
+    return arrange
+
+# 对初始种群求解
+adapt = [] # 
+for i in range(size): # 都求解一遍
+    adapt.append(solve(X[i])) # 结果保存到 adapt[] 中
+print('初始适应度值：\n', adapt)
+print(min(adapt))
+
+#Rank = arran(adapt) # 排列一遍
+Rank = a3.least3(adapt) # 排列一遍
+# 两个 list，X[i] 与其适应度 adapt[i]，下面整理他们的排名，arrange[n]为第 n 好的解在 list 中的位置
+
+def probe(NP): # 根据原 X 向 XA XB XC 三个方向探测  （A 和 C 每次都是随机？） 经测试，此种效果更好
+    a = 1*(2 - 2*t/MI) # 控制距离参数（从第 1 代开始） t 当前迭代次数，a 控制距离参数，MI 最大迭代次数 # 测试学习率系数 # 增大学习率，增加随机性？ 产生一定变异有助于随机寻优？
+    X1 = X[Rank[0]] + (2*a*random.random() - a)*abs((2*t/MI + random.random())*X[Rank[0]] - NP)
+    X2 = X[Rank[1]] + (2*a*random.random() - a)*abs((2*t/MI + random.random())*X[Rank[1]] - NP)
+    X3 = X[Rank[2]] + (2*a*random.random() - a)*abs((2*t/MI + random.random())*X[Rank[2]] - NP)
+    return (X1 + X2 + X3)/3 #  + X4 + X5 + X6
+
+#r = [random.random() for i in range(6)]
+#print('r:', r)
+#def probe(NP): # 根据原 X 向 XA XB XC 三个方向探测  （A 和 C 数值大小？） 三组 r1 r2 ？
+#    a = 2*(2 - 2*t/MI) # 控制距离参数（从第 1 代开始） t 当前迭代次数，a 控制距离参数，MI 最大迭代次数 #A = 2*a*random.random() - a #C = 2*t/MI + random.random() # 有利于逐渐收敛的 C 值，系数向量
+#    X1 = X[Rank[0]] + (2*a*r[0] - a)*abs((2*t/MI + r[1])*X[Rank[0]] - NP)
+#    X2 = X[Rank[1]] + (2*a*r[2] - a)*abs((2*t/MI + r[3])*X[Rank[1]] - NP)
+#    X3 = X[Rank[2]] + (2*a*r[4] - a)*abs((2*t/MI + r[5])*X[Rank[2]] - NP)
+#    return (X1 + X2 + X3)/3
+
+#def probe(NP): # 粒子群
+#    a = 1*(2 - 2*t/MI) # 控制距离参数（从第 1 代开始） t 当前迭代次数，a 控制距离参数，MI 最大迭代次数 # 测试学习率系数 # 增大学习率，增加随机性？ 产生一定变异有助于随机寻优？
+#    X1 = X[Rank[0]] + (2*a*random.random() - a)*abs((2*t/MI + random.random())*X[Rank[0]] - NP)
+#    return X1 #  + X4 + X5 + X6
+
+def update(n): # 对排名第 n 的 X 向量进行试探更新
+    PX = probe(X[Rank[n]]) # Rank[n] 为第 n 好的 X 向量位置，固定根据 X[Rank[n]]向三个方向延申的 探测向量值
+    SX = solve(PX) # 对 探测值 求解
+    if SX <= adapt[Rank[n]]: # 如果新 PX 值更优
+        X[Rank[n]] = PX # X[i] 更新为 探测值 **********************************************************    用 onea 归一化
+        adapt[Rank[n]] = SX
+
+def Iteration(t): # 第 t 代迭代， A1 A2 A3 及 C1 C2 C3 怎么设定
+    for n in range(3, size): # 从 第 4 个 or 第 1 个 X[arrange[3]] 开始试探
+        update(n) # 逐个更新
+#    print('适应度值：\n', adapt) # 把 适应度值 显示出来看看
+    global Rank # ******************************************* global 变为全局变量
+    Rank = arran(adapt) # 全部求解完成后排列一下
+#    print('Rank', Rank)
+## 前三的结果显示一下    
+#    print('第 1', X[Rank[0]])
+#    print('第 2', X[Rank[1]])
+#    print('第 3', X[Rank[2]])
+#    print('第 1', adapt[Rank[0]])
+#    print('第 2', adapt[Rank[1]])
+#    print('第 3', adapt[Rank[2]])
+#############-迭代-############################################################
+for t in range(MI): # 迭代
+    print('第%d次迭代:'%t)
+    Iteration(t)
+print('最优解为：\n', X[Rank[0]]) # 最终输出排在第 0 位的解，即最优解
+print('最优适应度：\n', adapt[Rank[0]])
+#print('设备选择：\n', MCH)
+#print('开始时间：\n', STP)
+#print('浇次开始时间：\n', STP)
+#############-解一编最优解-#####################################################
+"""
+solve(X[Rank[0]])
+#### 画图
+def gtag(name, quat): # 生成 Y 轴机器序标签列 （做标签用，与计算无关）
+    temp = []
+    for j in range(len(quat)): # 生成机器名称序列
+        for k in range(quat[j]):
+            temp.append('%s%d' %(name[j], k))
+    return temp
+st = ['CF', '1RF', '2RF', 'CC'] # '%s%d' %(st[j], k)
+AM = gtag(st, MQ) #  Y 轴机器序标签列
+
+import matplotlib.pyplot as plt
+
+color = ["#FCB711", "#F37021", "#CC004C", "#6460AA", "#0089D0", "#0DB14B","#FC0504", "#647021","#FC0504", "#647021"]
+
+def gantt(M, T): # 根据两个矩阵画图
+    for i in range(len(P)): # i 遍历炉次
+        for j in range(len(P[i])): # j 遍历工序
+# y轴（机器序列）， left= 水平条的起始位置， height 水平条的宽度， width 水平条的长度
+            plt.barh(MCH[i][j], left = STP[i][j], height = 0.6, width = P[i][j][1], color = color[i%8])
+            plt.text(STP[i][j], MCH[i][j], '%d' %(i), color="white", size = 10)
+#                plt.text(JT[i][j], MK(i,j) + sts(j), '炉次%d' %(i), color="white", size = 10)
+    plt.yticks(np.arange(len(AM)), AM, size = 10) # AM 是二维
+
+gantt(MCH, STP)
+"""
